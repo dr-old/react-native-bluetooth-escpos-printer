@@ -375,58 +375,48 @@ public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
 
 @ReactMethod
 public void printDivider(@Nullable ReadableMap options) {
-    String dividerChar = "-"; // default char
-    int height = 1;           // number of lines
+    String dividerChar = "-";
+    int height = 1;
     int marginTop = 0;
     int marginBottom = 0;
-    boolean useSpaces = false; // flag for full line of spaces
+    boolean useSpaces = false;
 
     if (options != null) {
         if (options.hasKey("char")) {
             String optChar = options.getString("char");
             if (optChar == null) {
-                useSpaces = true; // null -> use spaces
+                useSpaces = true;
             } else if (optChar.trim().isEmpty()) {
-                dividerChar = "-"; // empty or space -> default char
+                dividerChar = "-";
             } else {
-                dividerChar = optChar; // use provided char
+                dividerChar = optChar.substring(0, 1); // ensure single char
             }
         }
 
-        if (options.hasKey("height")) {
-            height = options.getInt("height");
-        }
-
-        if (options.hasKey("marginTop")) {
-            marginTop = options.getInt("marginTop");
-        }
-
-        if (options.hasKey("marginBottom")) {
-            marginBottom = options.getInt("marginBottom");
-        }
+        height = options.hasKey("height") ? options.getInt("height") : 1;
+        marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
+        marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
     }
 
-    // ESC/POS init
+    // Convert device width (pixels) → character width
+    int charWidth = deviceWidth / 8;
+
     sendDataByte(Command.ESC_Init);
 
-    // Margin top
     if (marginTop > 0) {
         sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
     }
 
-    // Build divider line
     StringBuilder lineBuilder = new StringBuilder();
-    for (int i = 0; i < deviceWidth; i++) {
+    for (int i = 0; i < charWidth; i++) {
         lineBuilder.append(useSpaces ? " " : dividerChar);
     }
     String line = lineBuilder.toString() + "\n";
 
-    // Print divider height times
     for (int i = 0; i < height; i++) {
         sendDataByte(line.getBytes());
     }
 
-    // Margin bottom
     if (marginBottom > 0) {
         sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
     }
