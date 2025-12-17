@@ -315,49 +315,92 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         deviceWidth = width;
     }
 
-@ReactMethod
-public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
-    int width = 0;
-    int leftPadding = 0;
-    int marginTop = 0;
-    int marginBottom = 0;
-    String position = "left"; // default
+    @ReactMethod
+    public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
+        int width = 0;
+        int leftPadding = 0;
+        int marginTop = 0;
+        int marginBottom = 0;
+        String position = "left"; // default
 
-    if (options != null) {
-        width = options.hasKey("width") ? options.getInt("width") : 0;
-        marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
-        marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
+        if (options != null) {
+            width = options.hasKey("width") ? options.getInt("width") : 0;
+            marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
+            marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
 
-        if (options.hasKey("position")) {
-            position = options.getString("position");
+            if (options.hasKey("position")) {
+                position = options.getString("position");
+            }
+
+            // Manual override has highest priority
+            if (options.hasKey("left")) {
+                leftPadding = options.getInt("left");
+            }
         }
 
-        // Manual override has highest priority
-        if (options.hasKey("left")) {
-            leftPadding = options.getInt("left");
+        if (width <= 0 || width > deviceWidth) {
+            width = deviceWidth;
+        }
+
+        // 🔹 Calculate padding from position (if left not provided)
+        if (options == null || !options.hasKey("left")) {
+            if ("center".equals(position)) {
+                leftPadding = (deviceWidth - width) / 2;
+            } else if ("right".equals(position)) {
+                leftPadding = deviceWidth - width;
+            } else {
+                leftPadding = 0; // left
+            }
+        }
+
+        byte[] bytes = Base64.decode(base64encodeStr, Base64.DEFAULT);
+        Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+
+        if (bitmap != null) {
+            byte[] data = PrintPicture.POS_PrintBMP(bitmap, width, 0, leftPadding);
+
+            sendDataByte(Command.ESC_Init);
+
+            if (marginTop > 0) {
+                sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
+            }
+
+            sendDataByte(data);
+
+            if (marginBottom > 0) {
+                sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
+            }
         }
     }
 
-    if (width <= 0 || width > deviceWidth) {
-        width = deviceWidth;
-    }
+    @ReactMethod
+    public void printDivider(@Nullable ReadableMap options) {
+        String dividerChar = "-";
+        int height = 1;
+        int marginTop = 0;
+        int marginBottom = 0;
+        boolean useSpaces = false;
 
-    // 🔹 Calculate padding from position (if left not provided)
-    if (options == null || !options.hasKey("left")) {
-        if ("center".equals(position)) {
-            leftPadding = (deviceWidth - width) / 2;
-        } else if ("right".equals(position)) {
-            leftPadding = deviceWidth - width;
-        } else {
-            leftPadding = 0; // left
+        if (options != null) {
+            if (options.hasKey("char")) {
+                String optChar = options.getString("char");
+                if (optChar.trim().isEmpty()) {
+                    dividerChar = "-";
+                } else {
+                    dividerChar = optChar.substring(0, 1); // ensure single char
+                }
+            }
+
+            height = options.hasKey("height") ? options.getInt("height") : 1;
+            marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
+            marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
+        }else{
+            useSpaces = true;
+            height = 1;
         }
-    }
 
-    byte[] bytes = Base64.decode(base64encodeStr, Base64.DEFAULT);
-    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-
-    if (bitmap != null) {
-        byte[] data = PrintPicture.POS_PrintBMP(bitmap, width, 0, leftPadding);
+        // Convert device width (pixels) → character width
+        int charWidth = deviceWidth / 8;
 
         sendDataByte(Command.ESC_Init);
 
@@ -365,62 +408,20 @@ public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
             sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
         }
 
-        sendDataByte(data);
+        StringBuilder lineBuilder = new StringBuilder();
+        for (int i = 0; i < charWidth; i++) {
+            lineBuilder.append(useSpaces ? " " : dividerChar);
+        }
+        String line = lineBuilder.toString() + "\n";
+
+        for (int i = 0; i < height; i++) {
+            sendDataByte(line.getBytes());
+        }
 
         if (marginBottom > 0) {
             sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
         }
     }
-}
-
-@ReactMethod
-public void printDivider(@Nullable ReadableMap options) {
-    String dividerChar = "-";
-    int height = 1;
-    int marginTop = 0;
-    int marginBottom = 0;
-    boolean useSpaces = false;
-
-    if (options != null) {
-        if (options.hasKey("char")) {
-            String optChar = options.getString("char");
-            if (optChar.trim().isEmpty()) {
-                dividerChar = "-";
-            } else {
-                dividerChar = optChar.substring(0, 1); // ensure single char
-            }
-        }else{
-             useSpaces = true;
-        }
-
-        height = options.hasKey("height") ? options.getInt("height") : 1;
-        marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
-        marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
-    }
-
-    // Convert device width (pixels) → character width
-    int charWidth = deviceWidth / 8;
-
-    sendDataByte(Command.ESC_Init);
-
-    if (marginTop > 0) {
-        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
-    }
-
-    StringBuilder lineBuilder = new StringBuilder();
-    for (int i = 0; i < charWidth; i++) {
-        lineBuilder.append(useSpaces ? " " : dividerChar);
-    }
-    String line = lineBuilder.toString() + "\n";
-
-    for (int i = 0; i < height; i++) {
-        sendDataByte(line.getBytes());
-    }
-
-    if (marginBottom > 0) {
-        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
-    }
-}
 
 
     @ReactMethod
@@ -591,3 +592,4 @@ public void printDivider(@Nullable ReadableMap options) {
     }
 
 }
+
