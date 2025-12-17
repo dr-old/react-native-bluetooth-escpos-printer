@@ -315,47 +315,122 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         deviceWidth = width;
     }
 
-        @ReactMethod
-        public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
-            int width = 0;
-            int leftPadding = 0;
-            int marginTop = 0;
-            int marginBottom = 5; // default small bottom margin
-        
-            if (options != null) {
-                width = options.hasKey("width") ? options.getInt("width") : 0;
-                leftPadding = options.hasKey("left") ? options.getInt("left") : 0;
-                marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
-                marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 5;
-            }
-        
-            if (width > deviceWidth || width == 0) {
-                width = deviceWidth;
-            }
-        
-            byte[] bytes = Base64.decode(base64encodeStr, Base64.DEFAULT);
-            Bitmap mBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-        
-            if (mBitmap != null) {
-                byte[] data = PrintPicture.POS_PrintBMP(mBitmap, width, 0, leftPadding);
-        
-                // Reset printer
-                sendDataByte(Command.ESC_Init);
-        
-                // ✅ TOP MARGIN
-                if (marginTop > 0) {
-                    sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
-                }
-        
-                // Print image
-                sendDataByte(data);
-        
-                // ✅ BOTTOM MARGIN
-                if (marginBottom > 0) {
-                    sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
-                }
+@ReactMethod
+public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
+    int width = 0;
+    int leftPadding = 0;
+    int marginTop = 0;
+    int marginBottom = 0;
+    String position = "left"; // default
+
+    if (options != null) {
+        width = options.hasKey("width") ? options.getInt("width") : 0;
+        marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
+        marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
+
+        if (options.hasKey("position")) {
+            position = options.getString("position");
+        }
+
+        // Manual override has highest priority
+        if (options.hasKey("left")) {
+            leftPadding = options.getInt("left");
+        }
+    }
+
+    if (width <= 0 || width > deviceWidth) {
+        width = deviceWidth;
+    }
+
+    // 🔹 Calculate padding from position (if left not provided)
+    if (options == null || !options.hasKey("left")) {
+        if ("center".equals(position)) {
+            leftPadding = (deviceWidth - width) / 2;
+        } else if ("right".equals(position)) {
+            leftPadding = deviceWidth - width;
+        } else {
+            leftPadding = 0; // left
+        }
+    }
+
+    byte[] bytes = Base64.decode(base64encodeStr, Base64.DEFAULT);
+    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+
+    if (bitmap != null) {
+        byte[] data = PrintPicture.POS_PrintBMP(bitmap, width, 0, leftPadding);
+
+        sendDataByte(Command.ESC_Init);
+
+        if (marginTop > 0) {
+            sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
+        }
+
+        sendDataByte(data);
+
+        if (marginBottom > 0) {
+            sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
+        }
+    }
+}
+
+@ReactMethod
+public void printDivider(@Nullable ReadableMap options) {
+    String dividerChar = "-"; // default char
+    int height = 1;           // number of lines
+    int marginTop = 0;
+    int marginBottom = 0;
+    boolean useSpaces = false; // flag for full line of spaces
+
+    if (options != null) {
+        if (options.hasKey("char")) {
+            String optChar = options.getString("char");
+            if (optChar == null) {
+                useSpaces = true; // null -> use spaces
+            } else if (optChar.trim().isEmpty()) {
+                dividerChar = "-"; // empty or space -> default char
+            } else {
+                dividerChar = optChar; // use provided char
             }
         }
+
+        if (options.hasKey("height")) {
+            height = options.getInt("height");
+        }
+
+        if (options.hasKey("marginTop")) {
+            marginTop = options.getInt("marginTop");
+        }
+
+        if (options.hasKey("marginBottom")) {
+            marginBottom = options.getInt("marginBottom");
+        }
+    }
+
+    // ESC/POS init
+    sendDataByte(Command.ESC_Init);
+
+    // Margin top
+    if (marginTop > 0) {
+        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
+    }
+
+    // Build divider line
+    StringBuilder lineBuilder = new StringBuilder();
+    for (int i = 0; i < deviceWidth; i++) {
+        lineBuilder.append(useSpaces ? " " : dividerChar);
+    }
+    String line = lineBuilder.toString() + "\n";
+
+    // Print divider height times
+    for (int i = 0; i < height; i++) {
+        sendDataByte(line.getBytes());
+    }
+
+    // Margin bottom
+    if (marginBottom > 0) {
+        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
+    }
+}
 
 
     @ReactMethod
