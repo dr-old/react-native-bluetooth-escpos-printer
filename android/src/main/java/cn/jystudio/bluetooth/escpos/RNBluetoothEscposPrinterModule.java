@@ -384,13 +384,13 @@ public void printDivider(@Nullable ReadableMap options) {
     if (options != null) {
         if (options.hasKey("char")) {
             String optChar = options.getString("char");
-            if (optChar == null) {
-                useSpaces = true;
-            } else if (optChar.trim().isEmpty()) {
+            if (optChar.trim().isEmpty()) {
                 dividerChar = "-";
             } else {
                 dividerChar = optChar.substring(0, 1); // ensure single char
             }
+        }else{
+             useSpaces = true;
         }
 
         height = options.hasKey("height") ? options.getInt("height") : 1;
