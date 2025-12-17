@@ -384,7 +384,9 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         if (options != null) {
             if (options.hasKey("char")) {
                 String optChar = options.getString("char");
-                if (optChar.trim().isEmpty()) {
+                if (optChar == null){
+                    useSpaces = true;  
+                } else if (optChar.trim().isEmpty()) {
                     dividerChar = "-";
                 } else {
                     dividerChar = optChar.substring(0, 1); // ensure single char
@@ -394,9 +396,6 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
             height = options.hasKey("height") ? options.getInt("height") : 1;
             marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
             marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
-        }else{
-            useSpaces = true;
-            height = 1;
         }
 
         // Convert device width (pixels) → character width
