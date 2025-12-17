@@ -373,62 +373,62 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         }
     }
 
-    @ReactMethod
-    public void printDivider(@Nullable ReadableMap options) {
-        String dividerChar = "-";
-        int height = 1;
-        int marginTop = 0;
-        int marginBottom = 0;
-        boolean useSpaces = false;
+@ReactMethod
+public void printDivider(@Nullable ReadableMap options) {
+    String dividerChar = "-";
+    int height = 1;
+    int marginTop = 0;
+    int marginBottom = 0;
 
-        if (options != null) {
-            if (options.hasKey("char")) {
-                String optChar = options.getString("char");
-                if (optChar == null){
-                    useSpaces = true;  
-                } else if (optChar.trim().isEmpty()) {
-                    dividerChar = "-";
-                } else {
-                    dividerChar = optChar.substring(0, 1); // ensure single char
-                }
-            }
-
-            if (options.hasKey("height")) {
-                height = options.getInt("height");
-            }
-        
-            if (options.hasKey("marginTop")) {
-                marginTop = options.getInt("marginTop");
-            }
-        
-            if (options.hasKey("marginBottom")) {
-                marginBottom = options.getInt("marginBottom");
+    if (options != null) {
+        // Determine the divider character
+        if (options.hasKey("char")) {
+            String optChar = options.getString("char");
+            if (optChar == null) {
+                dividerChar = " "; // use space if null
+            } else if (optChar.trim().isEmpty()) {
+                dividerChar = "-"; // default dash if empty string
+            } else {
+                dividerChar = optChar.substring(0, 1); // first character
             }
         }
 
-        // Convert device width (pixels) → character width
-        int charWidth = deviceWidth / 8;
-
-        sendDataByte(Command.ESC_Init);
-
-        if (marginTop > 0) {
-            sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
-        }
-
-        StringBuilder lineBuilder = new StringBuilder();
-        for (int i = 0; i < charWidth; i++) {
-            lineBuilder.append(useSpaces ? " " : dividerChar);
-        }
-        String line = lineBuilder.toString() + "\n";
-
-        for (int i = 0; i < height; i++) {
-            sendDataByte(line.getBytes());
-        }
-
-        if (marginBottom > 0) {
-            sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
-        }
+        height = options.hasKey("height") ? options.getInt("height") : 1;
+        marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
+        marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
+    } else {
+        dividerChar = " "; // default to space if options is null
     }
+
+    // Convert device width (pixels) → character width
+    int charWidth = deviceWidth / 8;
+
+    // Initialize printer
+    sendDataByte(Command.ESC_Init);
+
+    // Print top margin
+    if (marginTop > 0) {
+        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
+    }
+
+    // Build divider line
+    StringBuilder lineBuilder = new StringBuilder();
+    for (int i = 0; i < charWidth; i++) {
+        lineBuilder.append(dividerChar);
+    }
+    String line = lineBuilder.toString() + "\r\n";
+
+    // Print divider lines (height times)
+    for (int i = 0; i < height; i++) {
+        sendDataByte(line.getBytes());
+    }
+
+    // Print bottom margin
+    if (marginBottom > 0) {
+        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
+    }
+}
+
 
 
     @ReactMethod
