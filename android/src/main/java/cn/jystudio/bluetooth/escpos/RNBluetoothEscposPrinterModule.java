@@ -315,6 +315,49 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         deviceWidth = width;
     }
 
+        @ReactMethod
+        public void printImage(String base64encodeStr, @Nullable ReadableMap options) {
+            int width = 0;
+            int leftPadding = 0;
+            int marginTop = 0;
+            int marginBottom = 5; // default small bottom margin
+        
+            if (options != null) {
+                width = options.hasKey("width") ? options.getInt("width") : 0;
+                leftPadding = options.hasKey("left") ? options.getInt("left") : 0;
+                marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
+                marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 5;
+            }
+        
+            if (width > deviceWidth || width == 0) {
+                width = deviceWidth;
+            }
+        
+            byte[] bytes = Base64.decode(base64encodeStr, Base64.DEFAULT);
+            Bitmap mBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        
+            if (mBitmap != null) {
+                byte[] data = PrintPicture.POS_PrintBMP(mBitmap, width, 0, leftPadding);
+        
+                // Reset printer
+                sendDataByte(Command.ESC_Init);
+        
+                // ✅ TOP MARGIN
+                if (marginTop > 0) {
+                    sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
+                }
+        
+                // Print image
+                sendDataByte(data);
+        
+                // ✅ BOTTOM MARGIN
+                if (marginBottom > 0) {
+                    sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
+                }
+            }
+        }
+
+
     @ReactMethod
     public void printPic(String base64encodeStr, @Nullable  ReadableMap options) {
         int width = 0;
