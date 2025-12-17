@@ -393,9 +393,17 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
                 }
             }
 
-            height = options.hasKey("height") ? options.getInt("height") : 1;
-            marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
-            marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
+            if (options.hasKey("height")) {
+                height = options.getInt("height");
+            }
+        
+            if (options.hasKey("marginTop")) {
+                marginTop = options.getInt("marginTop");
+            }
+        
+            if (options.hasKey("marginBottom")) {
+                marginBottom = options.getInt("marginBottom");
+            }
         }
 
         // Convert device width (pixels) → character width
