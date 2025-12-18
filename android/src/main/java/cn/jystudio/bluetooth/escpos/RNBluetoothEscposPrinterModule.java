@@ -86,17 +86,73 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
     }
 
     @ReactMethod
-    public void printerLineSpace(int sp,final Promise promise){
-        byte[] command = PrinterCommand.POS_Set_DefLineSpace();
-        if(sp>0){
+    public void printerLineSpace(int sp, final Promise promise) {
+        byte[] command;
+
+        if (sp < 0) {
+            // Restore printer default line spacing
+            command = PrinterCommand.POS_Set_DefLineSpace();
+        } else {
+            // Explicitly set line spacing (0 = tight)
             command = PrinterCommand.POS_Set_LineSpace(sp);
         }
-        if(command==null || !sendDataByte(command)){
+
+        if (command == null || !sendDataByte(command)) {
             promise.reject("COMMAND_NOT_SEND");
-        }else{
+        } else {
             promise.resolve(null);
         }
     }
+
+    @ReactMethod
+    public void printDivider(@Nullable String charLine, @Nullable Integer height, final Promise promise) {
+        try {
+            // ---------- Defaults ----------
+            String dividerChar = "-";
+            int repeatHeight = 1; // default height = 1 line
+
+            // ---------- Read input ----------
+            if (charLine != null) {
+                dividerChar = charLine.substring(0, 1);
+            }
+            if (height != null && height > 0) {
+                repeatHeight = height;
+            }
+
+            // ---------- Full printer width ----------
+            int charWidth = deviceWidth / 8;
+
+            // ---------- Build divider line ----------
+            StringBuilder sb = new StringBuilder(charWidth);
+            for (int i = 0; i < charWidth; i++) {
+                sb.append(dividerChar);
+            }
+            String line = sb.toString() + "\r\n";
+
+            // ---------- Print multiple times ----------
+            for (int i = 0; i < repeatHeight; i++) {
+                byte[] data = PrinterCommand.POS_Print_Text(
+                        line,
+                        "GBK",
+                        0,
+                        0,
+                        0,
+                        0
+                );
+                if (!sendDataByte(data)) {
+                    promise.reject("COMMAND_NOT_SEND");
+                    return;
+                }
+            }
+
+            promise.resolve(null);
+
+        } catch (Exception e) {
+            promise.reject("PRINT_DIVIDER_FAILED", e);
+        }
+    }
+
+
 
     /**
      * Under line switch, 0-off,1-on,2-deeper
@@ -310,9 +366,19 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
         promise.resolve(null);
     }
 
+
     @ReactMethod
     public void setWidth(int width) {
         deviceWidth = width;
+    }
+
+    @ReactMethod
+    public void getWidth(final Promise promise) {
+        try {
+            promise.resolve(deviceWidth);
+        } catch (Exception e) {
+            promise.reject("GET_WIDTH_FAILED", e);
+        }
     }
 
     @ReactMethod
@@ -372,63 +438,6 @@ public class RNBluetoothEscposPrinterModule extends ReactContextBaseJavaModule
             }
         }
     }
-
-@ReactMethod
-public void printDivider(@Nullable ReadableMap options) {
-    String dividerChar = "-";
-    int height = 1;
-    int marginTop = 0;
-    int marginBottom = 0;
-
-    if (options != null) {
-        // Determine the divider character
-        if (options.hasKey("char")) {
-            String optChar = options.getString("char");
-            if (optChar == null) {
-                dividerChar = " "; // use space if null
-            } else if (optChar.trim().isEmpty()) {
-                dividerChar = "-"; // default dash if empty string
-            } else {
-                dividerChar = optChar.substring(0, 1); // first character
-            }
-        }
-
-        height = options.hasKey("height") ? options.getInt("height") : 1;
-        marginTop = options.hasKey("marginTop") ? options.getInt("marginTop") : 0;
-        marginBottom = options.hasKey("marginBottom") ? options.getInt("marginBottom") : 0;
-    } else {
-        dividerChar = " "; // default to space if options is null
-    }
-
-    // Convert device width (pixels) → character width
-    int charWidth = deviceWidth / 8;
-
-    // Initialize printer
-    sendDataByte(Command.ESC_Init);
-
-    // Print top margin
-    if (marginTop > 0) {
-        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginTop));
-    }
-
-    // Build divider line
-    StringBuilder lineBuilder = new StringBuilder();
-    for (int i = 0; i < charWidth; i++) {
-        lineBuilder.append(dividerChar);
-    }
-    String line = lineBuilder.toString() + "\r\n";
-
-    // Print divider lines (height times)
-    for (int i = 0; i < height; i++) {
-        sendDataByte(line.getBytes());
-    }
-
-    // Print bottom margin
-    if (marginBottom > 0) {
-        sendDataByte(PrinterCommand.POS_Set_PrtAndFeedPaper(marginBottom));
-    }
-}
-
 
 
     @ReactMethod
@@ -599,4 +608,5 @@ public void printDivider(@Nullable ReadableMap options) {
     }
 
 }
+
 
